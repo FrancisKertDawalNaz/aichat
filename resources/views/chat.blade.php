@@ -22,41 +22,81 @@
             </div>
             @endforeach
         </div>
-        <div class="chat-input">
-            <input type="text" id="message" class="form-control" placeholder="Type a message..." onkeypress="if(event.key === 'Enter'){sendMessage()}">
-            <button class="btn btn-primary" onclick="sendMessage()">Send</button>
+        <div class="chat-input d-flex gap-2">
+            <input type="text" id="message" class="form-control" placeholder="Type a message..."
+                onkeypress="if(event.key === 'Enter'){sendMessage()}">
+            <button id="send-btn" class="btn btn-primary" onclick="sendMessage()">Send</button>
         </div>
     </div>
 
     <script>
-        function sendMessage() {
-            let message = document.getElementById('message').value;
-            if (!message.trim()) return;
-            let chatBox = document.getElementById('chat-box');
+        const chatBox = document.getElementById('chat-box');
+        const messageInput = document.getElementById('message');
+        const sendBtn = document.getElementById('send-btn');
 
-            fetch('/chat/send', {
+        // Auto-scroll on page load
+        window.onload = () => {
+            chatBox.scrollTop = chatBox.scrollHeight;
+        };
+
+        function escapeHtml(text) {
+            let div = document.createElement("div");
+            div.innerText = text;
+            return div.innerHTML;
+        }
+
+        async function sendMessage() {
+            let message = messageInput.value.trim();
+            if (!message) return;
+
+            // Append user message instantly
+            chatBox.innerHTML += `
+                <div class="chat-message user">
+                    <div class="chat-bubble">${escapeHtml(message)}</div>
+                </div>`;
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            // Show typing indicator
+            let typingEl = document.createElement("div");
+            typingEl.className = "chat-message ai typing";
+            typingEl.innerHTML = `<div class="chat-bubble">...</div>`;
+            chatBox.appendChild(typingEl);
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            // Clear input
+            messageInput.value = '';
+            sendBtn.disabled = true;
+
+            try {
+                let res = await fetch('/chat/send', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
                     },
-                    body: JSON.stringify({
-                        message: message
-                    })
-                })
-                .then(res => res.json())
-                .then(data => {
-                    chatBox.innerHTML += `
-                    <div class="chat-message user">
-                        <div class="chat-bubble">${message}</div>
-                    </div>`;
-                    chatBox.innerHTML += `
-                    <div class="chat-message ai">
-                        <div class="chat-bubble">${data.reply}</div>
-                    </div>`;
-                    document.getElementById('message').value = '';
-                    chatBox.scrollTop = chatBox.scrollHeight;
+                    body: JSON.stringify({ message })
                 });
+                let data = await res.json();
+
+                // Remove typing indicator
+                typingEl.remove();
+
+                // Append AI reply
+                chatBox.innerHTML += `
+                    <div class="chat-message ai">
+                        <div class="chat-bubble">${escapeHtml(data.reply)}</div>
+                    </div>`;
+                chatBox.scrollTop = chatBox.scrollHeight;
+
+            } catch (err) {
+                typingEl.remove();
+                chatBox.innerHTML += `
+                    <div class="chat-message ai">
+                        <div class="chat-bubble text-danger">Error: Could not send message.</div>
+                    </div>`;
+            }
+
+            sendBtn.disabled = false;
         }
     </script>
 

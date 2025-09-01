@@ -3,12 +3,15 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use App\Models\message;
+use App\Models\Message;
+use App\Services\GeminiService;
+use Illuminate\Support\Facades\DB;
 
-class Chatcontroller extends Controller
+class ChatController extends Controller
 {
-    public function index(){
-        $messages = message::all();
+    public function index()
+    {
+        $messages = Message::all();
         return view('chat', compact('messages'));
     }
 
@@ -22,13 +25,9 @@ class Chatcontroller extends Controller
             'message' => $userMessage
         ]);
 
-        // Simple AI logic (rule-based)
-        $reply = "Sorry, I don’t understand yet 😅";
-        if (str_contains(strtolower($userMessage), 'hello')) {
-            $reply = "Hi! How can I help you today?";
-        } elseif (str_contains(strtolower($userMessage), 'bye')) {
-            $reply = "Goodbye! Take care.";
-        }
+        // Call Gemini AI service
+        $gemini = new GeminiService();
+        $reply = $gemini->getReply($userMessage);
 
         // Save AI reply
         Message::create([
